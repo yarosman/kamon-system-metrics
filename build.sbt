@@ -19,10 +19,11 @@ val kamonTestkit      = "io.kamon"                  %%  "kamon-testkit"         
 val sigarLoader       = "io.kamon"                  %   "sigar-loader"          % "1.6.5-rev003"
 val logback           = "ch.qos.logback"            %   "logback-classic"       % "1.0.13"
 val slf4jJul          = "org.slf4j"                 %   "jul-to-slf4j"          % "1.7.7"
+val oshi              = "com.github.oshi"           %   "oshi-core"             % "3.12.2"
 
 name := "kamon-system-metrics"
 
-libraryDependencies ++=
+libraryDependencies ++= Seq(oshi) ++
   compileScope(kamonCore, sigarLoader) ++
   testScope(scalatest, kamonTestkit, logback, slf4jJul)
 

@@ -20,9 +20,11 @@ import java.lang.management.ManagementFactory
 
 import org.hyperic.sigar.Sigar
 import org.slf4j.Logger
+import oshi.SystemInfo
 
 package object system {
   private lazy val sigar = new Sigar()
+  private lazy val oshi = new SystemInfo()
   private lazy val pid = ManagementFactory.getRuntimeMXBean.getName.split("@")(0).toLong
 
   private val filterName = SystemMetrics.FilterName
@@ -34,6 +36,7 @@ package object system {
       if (Kamon.filter(filterName, metricName)) {
         this match {
           case s: SigarMetricBuilder => Some(s.build(sigar, metricName, logger))
+          case o: OshiMetricBuilder => Some(o.build(oshi, metricName, logger))
           case jmx: JmxMetricBuilder => Some(jmx.build(metricName, logger))
           case custom: CustomMetricBuilder => Some(custom.build(pid, metricName, logger))
           case _ => None
@@ -46,6 +49,10 @@ package object system {
 
   sealed trait Builder {
     def register(): Option[Metric] = None
+  }
+
+  trait OshiMetricBuilder extends Builder {
+    def build(oshi: SystemInfo, metricName: String, logger: Logger): Metric
   }
 
   trait SigarMetricBuilder extends Builder {
