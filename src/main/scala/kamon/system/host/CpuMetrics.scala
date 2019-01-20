@@ -18,9 +18,9 @@ package kamon.system.host
 
 import kamon.Kamon
 import kamon.metric.Histogram
-import kamon.system.{Metric, MetricBuilder, SigarMetricBuilder}
-import org.hyperic.sigar.Sigar
+import kamon.system.{Metric, MetricBuilder, OshiMetricBuilder}
 import org.slf4j.Logger
+import oshi.SystemInfo
 
 /**
  *  Cpu usage metrics, as reported by Sigar:
@@ -31,32 +31,28 @@ import org.slf4j.Logger
  *    - stolen: Total percentage of system cpu involuntary wait time. @see [[https://www.datadoghq.com/2013/08/understanding-aws-stolen-cpu-and-how-it-affects-your-apps/ "Understanding Stolen Cpu"]]
  *    - combined:  Total percentage of user + system + nice + wait CPU usage.
   */
-object CpuMetrics extends MetricBuilder("host.cpu") with SigarMetricBuilder {
+object CpuMetrics extends MetricBuilder("host.cpu") with OshiMetricBuilder {
 
-  def build(sigar: Sigar, metricName: String, logger: Logger) = new Metric {
+  val emptyCpuData = Array.fill(7)(0L)
+
+  override def build(oshi: SystemInfo, metricName: String, logger: Logger): Metric = new Metric {
     val cpuMetric = new CpuMetric(metricName)
 
     def update(): Unit = {
-      import SigarSafeRunner._
+      import OshiSafeRunner._
 
-      def cpuPerc = {
-        val cpuPerc = sigar.getCpuPerc
-        ((cpuPerc.getUser * 100L).toLong,
-          (cpuPerc.getSys * 100L).toLong,
-          (cpuPerc.getWait * 100L).toLong,
-          (cpuPerc.getIdle * 100L).toLong,
-          (cpuPerc.getStolen * 100L).toLong,
-          (cpuPerc.getCombined * 100L).toLong)
-      }
+      def cpuTicks= oshi.getHardware.getProcessor.getSystemCpuLoadTicks
 
-      val (cpuUser, cpuSys, cpuWait, cpuIdle, cpuStolen, cpuCombined) = runSafe(cpuPerc, (0L, 0L, 0L, 0L, 0L, 0L), "cpu", logger)
+      val Array(user, nice, sys, idle, wait, irq, softIrq, stolen) = runSafe(cpuTicks, emptyCpuData, metricName, logger)
 
-      cpuMetric.forMode("user").record(cpuUser)
-      cpuMetric.forMode("system").record(cpuSys)
-      cpuMetric.forMode("wait").record(cpuWait)
-      cpuMetric.forMode("idle").record(cpuIdle)
-      cpuMetric.forMode("stolen").record(cpuStolen)
-      cpuMetric.forMode("combined").record(cpuCombined)
+      val total = user + nice + sys + idle + wait + irq + softIrq + stolen
+
+      cpuMetric.forMode("user").record(100L * user / total)
+      cpuMetric.forMode("system").record(100L * sys / total)
+      cpuMetric.forMode("wait").record(100L * wait / total)
+      cpuMetric.forMode("idle").record(100L * idle / total)
+      cpuMetric.forMode("stolen").record(100L * stolen / total)
+      cpuMetric.forMode("combined").record(100L * (user + sys + nice + wait) / total)
     }
   }
 

@@ -30,7 +30,7 @@ package object system {
   private val filterName = SystemMetrics.FilterName
   private val logger = SystemMetrics.logger
 
-  abstract class MetricBuilder(metricName: String) extends Builder {
+  abstract class MetricBuilder(val metricName: String) extends Builder {
 
     override def register(): Option[Metric] = {
       if (Kamon.filter(filterName, metricName)) {
