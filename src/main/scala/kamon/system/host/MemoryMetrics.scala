@@ -18,24 +18,24 @@ package kamon.system.host
 
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
-import kamon.system.{Metric, MetricBuilder, SigarMetricBuilder}
-import org.hyperic.sigar.Sigar
+import kamon.system.{Metric, MetricBuilder, OshiMetricBuilder}
 import org.slf4j.Logger
+import oshi.SystemInfo
 
 /**
- *  System memory usage metrics, as reported by Sigar:
+ *  System memory usage metrics, as reported by Oshi:
  *    - used: Total used system memory.
  *    - free: Total free system memory (e.g. Linux plus cached).
  *    - swap-used: Total used system swap.
  *    - swap-free: Total free system swap.
  */
-object MemoryMetrics extends MetricBuilder("host.memory") with SigarMetricBuilder {
-  def build(sigar: Sigar, metricName: String, logger: Logger) =  new Metric {
+object MemoryMetrics extends MetricBuilder("host.memory") with OshiMetricBuilder {
+
+  override def build(oshi: SystemInfo, metricName: String, logger: Logger): Metric = new Metric {
     val memoryUsageMetric = Kamon.histogram(metricName, MeasurementUnit.information.bytes)
     val swapUsageMetric = Kamon.histogram("host.swap", MeasurementUnit.information.bytes)
 
     val usedMetric      = memoryUsageMetric.refine(Map("component" -> "system-metrics", "mode" -> "used"))
-    val cachedMetric    = memoryUsageMetric.refine(Map("component" -> "system-metrics", "mode" -> "cached-and-buffered"))
     val freeMetric      = memoryUsageMetric.refine(Map("component" -> "system-metrics", "mode" -> "free"))
     val totalMetric     = memoryUsageMetric.refine(Map("component" -> "system-metrics", "mode" -> "total"))
 
@@ -43,30 +43,26 @@ object MemoryMetrics extends MetricBuilder("host.memory") with SigarMetricBuilde
     val swapFreeMetric  = swapUsageMetric.refine(Map("component" -> "system-metrics", "mode" -> "free"))
 
     override def update(): Unit = {
-      import SigarSafeRunner._
+      import OshiSafeRunner._
 
       def mem = {
-        val mem = sigar.getMem
-        (mem.getActualUsed, mem.getActualFree, mem.getFree, mem.getTotal)
+        val mem = oshi.getHardware.getMemory
+        (mem.getAvailable, mem.getTotal)
       }
 
       def swap = {
-        val swap = sigar.getSwap
-        (swap.getUsed, swap.getFree)
+        val swap = oshi.getHardware.getMemory
+        (swap.getSwapUsed, swap.getSwapTotal)
       }
 
-      val (memActualUsed, memActualFree, memFree, memTotal) = runSafe(mem, (0L, 0L, 0L, 0L), "memory", logger)
-      val (memSwapUsed, memSwapFree) = runSafe(swap, (0L, 0L), "swap", logger)
+      val (memAvailable, memTotal) = runSafe(mem, (0L, 0L), "memory", logger)
+      val (memSwapUsed, memSwapTotal) = runSafe(swap, (0L, 0L), "swap", logger)
 
-      def cachedMemory = if (memActualFree > memFree) memActualFree - memFree else 0L
-
-      usedMetric.record(memActualUsed)
-      freeMetric.record(memActualFree)
-      cachedMetric.record(cachedMemory)
+      usedMetric.record(memTotal - memAvailable)
+      freeMetric.record(memAvailable)
       totalMetric.record(memTotal)
       swapUsedMetric.record(memSwapUsed)
-      swapFreeMetric.record(memSwapFree)
+      swapFreeMetric.record(memSwapTotal - memSwapUsed)
     }
   }
 }
-

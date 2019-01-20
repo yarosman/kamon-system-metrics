@@ -11,6 +11,8 @@ import oshi.util.FormatUtil
 import oshi.util.Util
 import java.util
 
+import org.hyperic.sigar.Sigar
+
 object SystemInfoTest {
 
   val LOG = LoggerFactory.getLogger(this.getClass)
@@ -26,10 +28,10 @@ object SystemInfoTest {
 //    printComputerSystem(hal.getComputerSystem)
 //    LOG.info("Checking Processor...")
 //    printProcessor(hal.getProcessor)
-//    LOG.info("Checking Memory...")
-//    printMemory(hal.getMemory)
-    LOG.info("Checking CPU...")
-    printCpu(hal.getProcessor)
+    LOG.info("Checking Memory...")
+    printMemory(hal.getMemory)
+//    LOG.info("Checking CPU...")
+//    printCpu(hal.getProcessor)
 //    LOG.info("Checking Processes...")
 //    printProcesses(os, hal.getMemory)
 //    LOG.info("Checking Sensors...")
@@ -85,9 +87,25 @@ object SystemInfoTest {
   }
 
   private def printMemory(memory: GlobalMemory): Unit = {
-    System.out.println("Memory: " + FormatUtil.formatBytes(memory.getAvailable) + "/" + FormatUtil.formatBytes(memory.getTotal))
+    System.out.println("Memory: " + memory.getAvailable + "/" + memory.getTotal + "/" + (memory.getAvailable - memory.getTotal))
 
     System.out.println("Swap used: " + FormatUtil.formatBytes(memory.getSwapUsed) + "/" + FormatUtil.formatBytes(memory.getSwapTotal))
+
+
+    println("-----------------------")
+    val sigar = new Sigar()
+    val mem = sigar.getMem
+    //println(mem)
+
+    println(mem.getActualUsed)
+    println(mem.getActualFree)
+    println(mem.getFree)
+    println(mem.getTotal)
+
+    println("-----------------------")
+    val swap = sigar.getSwap
+    println(swap.getUsed)
+    println(swap.getFree)
   }
 
   private def printCpu(processor: CentralProcessor): Unit = {
@@ -192,6 +210,8 @@ object SystemInfoTest {
       println((" %s (%s) [%s] %s of %s free (%.1f%%), %s of %s files free (%.1f%%) is %s " + (if (fs.getLogicalVolume != null && fs.getLogicalVolume.length > 0) "[%s]"
       else "%s") + " and is mounted at %s%n").format(fs.getName, if (fs.getDescription.isEmpty) "file system" else fs.getDescription, fs.getType, FormatUtil.formatBytes(usable), FormatUtil.formatBytes(fs.getTotalSpace), 100d * usable / total, fs.getFreeInodes, fs.getTotalInodes, 100d * fs.getFreeInodes / fs.getTotalInodes, fs.getVolume, fs.getLogicalVolume, fs.getMount))
     }
+
+
   }
 
   private def printNetworkInterfaces(networkIFs: Array[NetworkIF]): Unit = {
