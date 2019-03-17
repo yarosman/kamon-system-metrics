@@ -18,27 +18,31 @@ package kamon.system.host
 
 import kamon.Kamon
 import kamon.metric.Histogram
-import kamon.system.{Metric, MetricBuilder, SigarMetricBuilder}
-import org.hyperic.sigar.Sigar
+import kamon.system.{Metric, MetricBuilder, OshiMetricBuilder}
 import org.slf4j.Logger
+import oshi.SystemInfo
 
 /**
  *  Load Average metrics, as reported by Sigar:
  *    - The system load averages for the past 1, 5, and 15 minutes.
  */
-object LoadAverageMetrics extends MetricBuilder("host.load-average") with SigarMetricBuilder {
-  def build(sigar: Sigar, metricName: String, logger: Logger) = new Metric {
+object LoadAverageMetrics extends MetricBuilder("host.load-average") with OshiMetricBuilder {
+
+  def build(oshi: SystemInfo, metricName: String, logger: Logger) = new Metric {
     val periods = "1" :: "5" :: "15" :: Nil
     val loadAverageMetrics = LoadAverageMetrics(metricName)
 
     override def update(): Unit = {
-      import SigarSafeRunner._
+      import OshiSafeRunner._
 
-      val loadAverage = runSafe(sigar.getLoadAverage, Array(0D, 0D, 0D), "load-average", logger)
+      def loadTicks= oshi.getHardware.getProcessor.getSystemCpuLoadTicks
+
+      val loadAverage = runSafe(loadTicks, Array(0L, 0L, 0L), "load-average", logger)
 
       periods.zipWithIndex.foreach {
         case(period, index) =>
-          loadAverageMetrics.forPeriod(period).record(loadAverage(index).toLong)
+          val average = if (loadAverage(index) < 0L) 0L else loadAverage(index)
+          loadAverageMetrics.forPeriod(period).record(average)
       }
     }
   }
