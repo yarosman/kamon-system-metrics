@@ -17,21 +17,21 @@
 package kamon.system.process
 
 import kamon.Kamon
-import kamon.system.host.SigarSafeRunner
-import kamon.system.{Metric, MetricBuilder, SigarMetricBuilder}
-import org.hyperic.sigar.Sigar
+import kamon.system.{Metric, MetricBuilder, OshiMetricBuilder}
 import org.slf4j.Logger
+import oshi.SystemInfo
 
-object ULimitMetrics extends MetricBuilder("process.ulimit") with SigarMetricBuilder {
-  def build(sigar: Sigar, metricName: String, logger: Logger) = new Metric {
-    val pid = sigar.getPid
+object ULimitMetrics extends MetricBuilder("process.ulimit") with OshiMetricBuilder {
+
+  override def build(oshi: SystemInfo, metricName: String, logger: Logger): Metric = new Metric {
+    val pid = oshi.getOperatingSystem.getProcessId
     val ulimitMetric = Kamon.histogram(metricName)
     val openFilesMetric = ulimitMetric.refine(Map("component" -> "system-metrics", "limit" -> "open-files"))
 
     override def update(): Unit = {
-      import SigarSafeRunner._
+      import kamon.system.host.OshiSafeRunner._
 
-      openFilesMetric.record(runSafe(sigar.getProcFd(pid).getTotal, 0L, "open-files", logger))
+      openFilesMetric.record(runSafe(oshi.getOperatingSystem.getProcess(pid).getOpenFiles, 0L, "open-files", logger))
     }
   }
 }
