@@ -35,14 +35,14 @@ object LoadAverageMetrics extends MetricBuilder("host.load-average") with OshiMe
     override def update(): Unit = {
       import OshiSafeRunner._
 
-      def loadTicks= oshi.getHardware.getProcessor.getSystemCpuLoadTicks
+      def loadTicks= oshi.getHardware.getProcessor.getSystemLoadAverage(3)
 
-      val loadAverage = runSafe(loadTicks, Array(0L, 0L, 0L), "load-average", logger)
+      val loadAverage = runSafe(loadTicks, Array(0D, 0D, 0D), "load-average", logger)
 
       periods.zipWithIndex.foreach {
         case(period, index) =>
-          val average = if (loadAverage(index) < 0L) 0L else loadAverage(index)
-          loadAverageMetrics.forPeriod(period).record(average)
+          val average = if (loadAverage(index) < 0D) 0D else loadAverage(index)
+          loadAverageMetrics.forPeriod(period).record(average.toLong)
       }
     }
   }
